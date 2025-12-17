@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html>
+<head> 
+<style>
+  body { margin: 0; overflow: hidden; font-family: 'Courier New', Courier, monospace; display: flex; justify-content: center; align-items: center; height: 100vh; background: #1a1a1a; }
+  #game { position: relative; width: 320px; height: 480px; border: 4px solid #fff; overflow: hidden; transition: background 3s ease; background: #70c5ce; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+  
+  /* City Background & Decorative Elements */
+  .building { position: absolute; bottom: 40px; background: #4ca4ab; z-index: 1; display: grid; padding: 4px; gap: 3px; border: 1px solid rgba(0,0,0,0.2); transition: background 3s; }
+  .window { background: rgba(255,255,255,0.2); width: 100%; height: 100%; border-radius: 1px; }
+  .window.lit { background: #fdf000; box-shadow: 0 0 4px #fdf000; }
+  .cloud { position: absolute; background: white; border-radius: 20px; opacity: 0.6; z-index: 2; }
+  .cloud::before, .cloud::after { content: ''; position: absolute; background: white; border-radius: 50%; width: 50%; height: 100%; top: -40%; }
+  .cloud::before { left: 10%; } .cloud::after { right: 10%; }
+  #ground { position: absolute; bottom: 0; width: 640px; height: 40px; background: #ded895; border-top: 4px solid #543847; z-index: 5; }
+
+  /* Bird & Wing Animation */
+  #bird { position: absolute; left: 50px; top: 230px; width: 22px; height: 20px; background: #fdf000; border: 2px solid #000; border-radius: 50%; z-index: 10; box-shadow: inset -4px -4px 0 rgba(0,0,0,0.2); transform-origin: center; }
+  #bird::before { content: ''; position: absolute; top: 4px; right: 4px; width: 4px; height: 4px; background: black; border-radius: 50%; } 
+  #bird::after { content: ''; position: absolute; top: 8px; right: -6px; width: 8px; height: 6px; background: #f00; border-radius: 2px; border: 1px solid #000; } 
+  #wing { position: absolute; left: -4px; top: 4px; width: 12px; height: 10px; background: white; border: 1px solid #000; border-radius: 50% 20%; transform-origin: right center; }
+  .flap { transform: rotate(-65deg); } 
+
+  /* 3D Pipe Visuals */
+  .pipe { position: absolute; width: 50px; background: linear-gradient(to right, #73bf2e, #a0d86b, #559021); border: 2px solid #000; z-index: 4; }
+  .pipe-cap { position: absolute; width: 60px; height: 22px; background: linear-gradient(to right, #73bf2e, #a0d86b, #559021); border: 2px solid #000; left: -7px; z-index: 5; border-radius: 3px; }
+
+  /* UI & Overlays */
+  #score { position: absolute; top: 10px; width: 100%; text-align: center; font-size: 40px; color: white; text-shadow: 3px 3px #000; z-index: 20; display: none; }
+  #menu { position: absolute; top: 0; left: 0; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 30; color: white; background: rgba(0,0,0,0.6); text-align: center; }
+  .stat-box { background: #ded895; border: 3px solid #543847; padding: 15px; color: #543847; border-radius: 8px; width: 220px; margin-bottom: 20px;}
+  #save-section { margin-bottom: 15px; display: none; }
+  #player-name { padding: 8px; border-radius: 4px; border: none; width: 140px; text-align: center; font-family: inherit; margin-bottom: 5px; }
+  #leaderboard-list { list-style: none; padding: 0; margin-top: 10px; font-size: 13px; text-align: left; border-top: 1px solid #54384733; padding-top: 5px; }
+  button { padding: 10px 20px; font-size: 18px; cursor: pointer; background: #e86101; border: 3px solid white; color: white; border-radius: 5px; font-weight: bold; }
+  #flash { position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: white; opacity: 0; z-index: 100; pointer-events: none; }
+  .flash-active { animation: flashEffect 0.2s; }
+  @keyframes flashEffect { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+<div id="game">
+  <div id="flash"></div>
+  <div id="score">0</div>
+  <div id="bird"><div id="wing"></div></div>
+  <div id="ground"></div>
+  <div id="menu">
+      <h2 style="text-shadow: 2px 2px #e86101;">FLAPPY BIRD</h2>
+      <div class="stat-box">
+          <p style="font-size:12px; margin:0">SCORE: <span id="final-score">0</span></p>
+          <p style="font-size:12px; margin:0">BEST: <span id="high-score">0</span></p>
+          <ul id="leaderboard-list">Loading scores...</ul>
+      </div>
+      <div id="save-section">
+          <input type="text" id="player-name" placeholder="YOUR NAME" maxlength="10">
+          <button onclick="submitScoreOnline()" style="font-size:14px; background:#2ecc71; padding: 5px 15px;">SAVE</button>
+      </div>
+      <button onclick="startGame()">START</button>
+  </div>
+</div>
+
+<script>
+  // LEADERBOARD CONFIG (2025)
+  const BOARD_ID = '13f91093-0d1d-4675-8dc4-08de3db0f70a';
+  const API_BASE = 'api.simpleboards.dev';
+
+  const bird = document.getElementById('bird'), wing = document.getElementById('wing'), game = document.getElementById('game'), flash = document.getElementById('flash'), scoreEl = document.getElementById('score'), menu = document.getElementById('menu'), finalScoreEl = document.getElementById('final-score'), highScoreEl = document.getElementById('high-score'), groundEl = document.getElementById('ground');
+  
+  let by = 230, bv = 0, pipes = [], clouds = [], buildings = [], score = 0, highscore = 0, running = false, isDead = false, groundX = 0, rotation = 0, tick = 0;
+  const gravity = 0.28, jump = -6.5, gameSpeed = 4.5;
+
+  function startGame() {
+    menu.style.display = 'none'; scoreEl.style.display = 'block';
+    document.getElementById('save-section').style.display = 'none';
+    resetGame(); running = true; requestAnimationFrame(update);
+  }
+
+  function resetGame() {
+    by = 230; bv = 0; score = 0; scoreEl.innerText = "0"; isDead = false; tick = 0;
+    pipes.forEach(p => { p.t.remove(); p.b.remove(); }); pipes = [];
+    buildings.forEach(b => b.el.remove()); buildings = [];
+    clouds.forEach(c => c.el.remove()); clouds = [];
+    updateTimeOfDay();
+  }
+
+  // ONLINE API LOGIC
+  async function submitScoreOnline() {
+    const name = document.getElementById('player-name').value.trim() || "Anonymous";
+    try {
+      await fetch(`${API_BASE}/entries`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-api-key": BOARD_ID },
+        body: JSON.stringify({ LeaderboardId: BOARD_ID, PlayerDisplayName: name, Score: Math.floor(score).toString() })
+      });
+      document.getElementById('save-section').style.display = 'none';
+      fetchLeaderboard();
+    } catch (e) { console.error("Save failed", e); }
+  }
+
+  async function fetchLeaderboard() {
+    try {
+      const res = await fetch(`${API_BASE}/leaderboards/${BOARD_ID}/entries`, { headers: { 'x-api-key': BOARD_ID } });
+      const entries = await res.json();
+      document.getElementById('leaderboard-list').innerHTML = "<strong>ONLINE RANKINGS:</strong><br>" + 
+        entries.slice(0, 5).map((e, i) => `<li>${i+1}. ${e.playerDisplayName}: ${e.score}</li>`).join('') || "<li>No scores yet!</li>";
+    } catch (e) { document.getElementById('leaderboard-list').innerText = "Leaderboard offline."; }
+  }
+
+  // PROCEDURAL WORLD GENERATION
+  function createBuilding() {
+    const b = document.createElement('div'), w = 45 + Math.random() * 25, h = 60 + Math.random() * 120;
+    b.className = 'building'; b.style.width = w + 'px'; b.style.height = h + 'px'; b.style.left = '330px';
+    const cols = Math.floor(w / 12), rows = Math.floor(h / 15);
+    b.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+    for (let i = 0; i < cols * rows; i++) {
+        const win = document.createElement('div');
+        win.className = 'window' + (Math.random() > 0.85 ? ' lit' : '');
+        b.appendChild(win);
+    }
+    game.appendChild(b); buildings.push({ el: b, x: 330, s: 0.6 });
+  }
+
+  function createCloud() {
+    const c = document.createElement('div'), size = 30 + Math.random() * 50;
+    c.className = 'cloud'; c.style.width = size + 'px'; c.style.height = (size * 0.5) + 'px';
+    c.style.left = '330px'; c.style.top = (Math.random() * 120) + 'px';
+    game.appendChild(c); clouds.push({ el: c, x: 330, s: 0.3 + Math.random() * 0.3 });
+  }
+
+  function createPipe() {
+    let gap = 125, h = Math.random() * 180 + 60;
+    let t = document.createElement('div'), b = document.createElement('div');
+    t.className = 'pipe'; b.className = 'pipe';
+    t.style.height = h + 'px'; t.style.top = '0'; t.style.left = '320px';
+    b.style.height = (440 - h - gap) + 'px'; b.style.bottom = '40px'; b.style.left = '320px';
+    t.innerHTML = '<div class="pipe-cap" style="bottom:-2px"></div>';
+    b.innerHTML = '<div class="pipe-cap" style="top:-2px"></div>';
+    game.appendChild(t); game.appendChild(b);
+    pipes.push({ t, b, x: 320, passed: false });
+  }
+
+  function updateTimeOfDay() {
+    if (score < 5) game.style.background = "#70c5ce"; 
+    else if (score < 12) game.style.background = "#4da9ff"; 
+    else if (score < 20) game.style.background = "#e86101"; 
+    else game.style.background = "#1a1a2e"; 
+  }
+
+  function gameOver() {
+    running = false; isDead = true;
+    flash.classList.add('flash-active'); setTimeout(() => flash.classList.remove('flash-active'), 200);
+    if (score > highscore) highscore = score;
+    finalScoreEl.innerText = score; highScoreEl.innerText = highscore;
+    document.getElementById('save-section').style.display = 'block';
+    menu.style.display = 'flex'; scoreEl.style.display = 'none';
+    fetchLeaderboard();
+  }
+
+  function update() {
+    if (!running) return;
+    tick++;
+    groundX = (groundX - gameSpeed) % 320;
+    groundEl.style.transform = `translateX(${groundX}px)`;
+
+    if (Math.random() < 0.01) createCloud();
+    clouds.forEach((c, i) => { c.x -= c.s; c.el.style.left = c.x + 'px'; if (c.x < -100) { c.el.remove(); clouds.splice(i, 1); } });
+
+    if (Math.random() < 0.015) createBuilding();
+    buildings.forEach((b, i) => { b.x -= b.s; b.el.style.left = b.x + 'px'; if (b.x < -100) { b.el.remove(); buildings.splice(i, 1); } });
+
+    bv += gravity; by += bv;
+    rotation = bv > 0 ? Math.min(rotation + 4, 90) : Math.max(rotation - 2, -25);
+    bird.style.top = by + 'px'; bird.style.transform = `rotate(${rotation}deg)`;
+
+    if (by < 0 || by > 420) return gameOver();
+    if (tick % 80 === 0) createPipe();
+
+    pipes.forEach((p, i) => {
+        p.x -= gameSpeed; p.t.style.left = p.b.style.left = p.x + 'px';
+        if (p.x < 72 && p.x > 20) {
+            const br = bird.getBoundingClientRect(), tr = p.t.getBoundingClientRect(), bbr = p.b.getBoundingClientRect();
+            if (br.right > tr.left && br.left < tr.right && (br.top < tr.bottom || br.bottom > bbr.top)) return gameOver();
+        }
+        if (!p.passed && p.x < 50) { p.passed = true; score++; scoreEl.innerText = score; updateTimeOfDay(); }
+        if (p.x < -60) { p.t.remove(); p.b.remove(); pipes.splice(i, 1); }
+    });
+    requestAnimationFrame(update);
+  }
+
+  window.addEventListener('keydown', e => { if (e.code === 'Space' || e.code === 'ArrowUp') { bv = jump; rotation = -25; wing.classList.add('flap'); setTimeout(()=>wing.classList.remove('flap'), 120); } });
+  game.addEventListener('mousedown', () => { bv = jump; });
+  fetchLeaderboard();
+</script>
+</body>
+</html>
