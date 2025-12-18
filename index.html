@@ -36,7 +36,6 @@
   #pause-overlay, #ready-overlay { display: none; }
   .stat-box { background: #ded895; border: 3px solid #543847; padding: 15px; color: #543847; border-radius: 8px; width: 220px; margin-bottom: 20px;}
   
-  /* Leaderboard Submission UI */
   #save-section { margin-bottom: 15px; display: none; }
   #player-name { padding: 8px; border-radius: 4px; border: none; width: 140px; text-align: center; font-family: inherit; }
   .btn-save { background: #2ecc71; margin-top: 5px; padding: 5px 10px; font-size: 14px; color: white; border: none; border-radius: 4px; cursor: pointer; }
@@ -53,11 +52,11 @@
   <div id="score">0</div>
   <button id="pauseBtn" onclick="togglePause()"></button>
   <div id="pause-overlay"><h1>PAUSED</h1><p>Press 'P' to Resume</p></div>
-  <div id="ready-overlay"><h2>GET READY</h2><p>SPACE OR CLICK TO JUMP</p></div>
+  <div id="ready-overlay"><h2 style="text-shadow: 2px 2px #e86101;">GET READY</h2><p>SPACE OR CLICK TO JUMP</p></div>
   <div id="bird"><div id="wing"></div></div>
   <div id="ground"></div>
   <div id="menu">
-      <h2>FLAPPY BIRD</h2>
+      <h2 style="text-shadow: 2px 2px #e86101;">FLAPPY BIRD</h2>
       <div class="stat-box">
           <p style="font-size:12px; margin:0">SCORE</p><h2 id="final-score" style="margin:5px 0">0</h2>
           <hr style="border:1px solid #543847; opacity: 0.3;">
@@ -74,8 +73,8 @@
 </div>
 
 <script>
-  // GOOGLE SHEETS URL
-  const scriptURL = https://script.google.com/macros/s/AKfycbz6sq0r2VCtwFfOzq1DkgfDg7ISVDkRT3qnXx3j_m6nCPYA2l3QdgeyyT7Ud4AnPAjXZw/exec;
+  // LEADERBOARD CONFIG
+  const scriptURL = "https://script.google.com/macros/s/AKfycbztyeHxDlnKfHbRzvVAVHdvYGWrRS9ygYuyB88mePUK7Y1X-6Ha0Ko-fVQumlTEjbrEuQ/exec";
 
   const bird = document.getElementById('bird'), wing = document.getElementById('wing'), game = document.getElementById('game'), flash = document.getElementById('flash'), scoreEl = document.getElementById('score'), menu = document.getElementById('menu'), readyOverlay = document.getElementById('ready-overlay'), pauseOverlay = document.getElementById('pause-overlay'), pauseBtn = document.getElementById('pauseBtn'), finalScoreEl = document.getElementById('final-score'), highScoreEl = document.getElementById('high-score'), groundEl = document.getElementById('ground');
   
@@ -84,32 +83,26 @@
 
   async function fetchLeaderboard() {
     try {
-      // 2025 Fix: Using timestamp to bypass browser cache
-      const res = await fetch(scriptURL + "?t=" + Date.now());
+      const res = await fetch(scriptURL);
       const entries = await res.json();
       const list = document.getElementById('leaderboard-list');
-      // Fix: Displaying both Name (column 0) and Score (column 1) from Sheet
       list.innerHTML = "<strong>TOP PLAYERS:</strong><br>" + 
-        entries.slice(0,5).map((e, i) => `<li>${i+1}. ${e[0]}: ${e[1]}</li>`).join('') || "<li>No scores yet!</li>";
-    } catch (e) { 
-        document.getElementById('leaderboard-list').innerText = "Leaderboard Syncing..."; 
-    }
+        entries.slice(0,5).map((e, i) => '<li>' + (i+1) + '. ' + e[0] + ': ' + e[1] + '</li>').join('') || "<li>No scores yet!</li>";
+    } catch (e) { document.getElementById('leaderboard-list').innerText = "Leaderboard Offline"; }
   }
 
   async function submitScore() {
     const name = document.getElementById('player-name').value.trim();
     if (!name) return alert("Enter a name!");
     try {
-      // 2025 Fix: 'no-cors' allows GitHub to send data to Google Sheets without complex headers
       await fetch(scriptURL, {
         method: "POST",
         mode: "no-cors",
-        headers: { "Content-Type": "text/plain" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: name, score: score })
       });
       document.getElementById('save-section').style.display = 'none';
-      // Wait for Google to process row before refreshing
-      setTimeout(fetchLeaderboard, 1500); 
+      setTimeout(fetchLeaderboard, 1500);
     } catch (err) { console.error(err); }
   }
 
@@ -180,10 +173,7 @@
     if (score > highscore) highscore = score;
     finalScoreEl.innerText = score; highScoreEl.innerText = highscore;
     document.getElementById('save-section').style.display = 'block';
-    setTimeout(() => { 
-        menu.style.display = 'flex'; scoreEl.style.display = 'none'; pauseBtn.style.display = 'none'; 
-        fetchLeaderboard();
-    }, 500);
+    setTimeout(() => { menu.style.display = 'flex'; scoreEl.style.display = 'none'; pauseBtn.style.display = 'none'; fetchLeaderboard(); }, 500);
   }
 
   function update() {
@@ -222,7 +212,6 @@
       if (e.key.toLowerCase() === 'p') togglePause();
   });
   game.addEventListener('mousedown', () => { if (waiting) startPhysics(); else if (running && !isDead && !isPaused) doJump(); });
-  
   update();
   fetchLeaderboard();
 </script>
