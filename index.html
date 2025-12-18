@@ -67,7 +67,7 @@
 </div>
 
 <script>
-  const scriptURL = "https://script.google.com/macros/s/AKfycbwmpb5tJ-PH1H-ls-Wkv9QNLo3zQBU7FSAHwHZ9Pc69a4kkSLjM7yy84trti8QNBDrF8A/exec";
+  const scriptURL = "/api/leaderboard";
 
   const bird = document.getElementById('bird'), wing = document.getElementById('wing'), game = document.getElementById('game'), flash = document.getElementById('flash'), scoreEl = document.getElementById('score'), menu = document.getElementById('menu'), readyOverlay = document.getElementById('ready-overlay'), pauseOverlay = document.getElementById('pause-overlay'), pauseBtn = document.getElementById('pauseBtn'), finalScoreEl = document.getElementById('final-score'), highScoreEl = document.getElementById('high-score'), groundEl = document.getElementById('ground');
   
@@ -76,23 +76,16 @@
 
  async function fetchLeaderboard() {
   try {
-    // Adding {mode: 'cors'} and checking response helps bypass blocks
-    const res = await fetch(scriptURL, { 
-      method: 'GET',
-      mode: 'cors',
-      headers: { 'Content-Type': 'text/plain' }
-    });
-    
+    const res = await fetch(scriptURL);
     if (!res.ok) throw new Error("Network response was not ok");
     const entries = await res.json();
     const list = document.getElementById('leaderboard-list');
     
-    // Safety check to ensure entries is an array before mapping
-    if (Array.isArray(entries)) {
+    if (Array.isArray(entries) && entries.length > 0) {
       list.innerHTML = "<strong>TOP PLAYERS:</strong><br>" + 
         entries.slice(0,5).map((e, i) => '<li>' + (i+1) + '. ' + (e[0] || "---") + ': ' + (e[1] || 0) + '</li>').join('');
     } else {
-      list.innerText = "No scores found.";
+      list.innerText = "No scores yet!";
     }
   } catch (e) { 
     console.error("Leaderboard error:", e);
@@ -109,13 +102,11 @@
     try {
       await fetch(scriptURL, {
         method: "POST",
-        // CRITICAL: Changing to 'text/plain' bypasses the CORS pre-flight block
-        headers: { "Content-Type": "text/plain;charset=utf-8" }, 
-        body: JSON.stringify({ name: name, score: score }),
-        redirect: "follow" // Essential for Google redirects
+        headers: { "Content-Type": "application/json" }, 
+        body: JSON.stringify({ name: name, score: score })
       });
       document.getElementById('save-section').style.display = 'none';
-      setTimeout(fetchLeaderboard, 2000);
+      setTimeout(fetchLeaderboard, 500);
     } catch (err) { console.error("Submit Error:", err); }
   }
 
