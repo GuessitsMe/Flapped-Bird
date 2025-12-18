@@ -3,29 +3,23 @@
 <head> 
 <style>
   body { margin: 0; overflow: hidden; font-family: 'Courier New', Courier, monospace; display: flex; justify-content: center; align-items: center; height: 100vh; background: #1a1a1a; }
-  #game { position: relative; width: 320px; height: 480px; border: 4px solid #fff; overflow: hidden; transition: background 3s ease; background: #70c5ce; box-shadow: 0 0 50px rgba(0,0,0,0.5); }
+  #game { position: relative; width: 320px; height: 480px; border: 4px solid #fff; overflow: hidden; transition: background 3s ease; background: #70c5ce; box-shadow: 0 0 50px rgba(0,0,0,0.5); touch-action: manipulation; user-select: none; }
   
-  /* City Background with Windows */
   .building { position: absolute; bottom: 40px; background: #4ca4ab; z-index: 1; display: grid; padding: 4px; gap: 3px; border: 1px solid rgba(0,0,0,0.2); transition: background 3s; }
   .window { background: rgba(255,255,255,0.2); width: 100%; height: 100%; border-radius: 1px; }
   .window.lit { background: #fdf000; box-shadow: 0 0 4px #fdf000; }
   .cloud { position: absolute; background: white; border-radius: 20px; opacity: 0.6; z-index: 2; }
-  .cloud::before, .cloud::after { content: ''; position: absolute; background: white; border-radius: 50%; }
-
   #ground { position: absolute; bottom: 0; width: 640px; height: 40px; background: #ded895; border-top: 4px solid #543847; z-index: 5; }
 
-  /* Bird Design */
   #bird { position: absolute; left: 50px; top: 230px; width: 22px; height: 20px; background: #fdf000; border: 2px solid #000; border-radius: 50%; z-index: 10; box-shadow: inset -4px -4px 0 rgba(0,0,0,0.2); transform-origin: center; }
   #bird::before { content: ''; position: absolute; top: 4px; right: 4px; width: 4px; height: 4px; background: black; border-radius: 50%; } 
   #bird::after { content: ''; position: absolute; top: 8px; right: -6px; width: 8px; height: 6px; background: #f00; border-radius: 2px; border: 1px solid #000; } 
   #wing { position: absolute; left: -4px; top: 4px; width: 12px; height: 10px; background: white; border: 1px solid #000; border-radius: 50% 20%; transform-origin: right center; }
   .flap { transform: rotate(-65deg); } 
 
-  /* 3D Pipe Look */
   .pipe { position: absolute; width: 50px; background: linear-gradient(to right, #73bf2e, #a0d86b, #559021); border: 2px solid #000; z-index: 4; }
   .pipe-cap { position: absolute; width: 60px; height: 22px; background: linear-gradient(to right, #73bf2e, #a0d86b, #559021); border: 2px solid #000; left: -7px; z-index: 5; border-radius: 3px; }
 
-  /* UI Overlays */
   #score { position: absolute; top: 10px; width: 100%; text-align: center; font-size: 40px; color: white; text-shadow: 3px 3px #000; z-index: 20; display: none; }
   #pauseBtn { position: absolute; top: 12px; right: 12px; width: 36px; height: 36px; background: #e86101; border: 3px solid white; border-radius: 50%; cursor: pointer; z-index: 50; display: none; box-shadow: 0 3px 0 #a04300; }
   #pauseBtn::before, #pauseBtn::after { content: ''; position: absolute; top: 50%; width: 4px; height: 14px; background: white; transform: translateY(-50%); border-radius: 2px; }
@@ -73,24 +67,40 @@
 </div>
 
 <script>
-  // LEADERBOARD CONFIG
-  const scriptURL = "https://script.google.com/macros/s/AKfycbzb8kDaAgWsxrv9DCQx5QX-bwAor9dGj5GsdBuW0atOR5fw5oY_7eUOvytr0iM3k429zA/exec";
+  const scriptURL = "https://script.google.com/macros/s/AKfycbwmpb5tJ-PH1H-ls-Wkv9QNLo3zQBU7FSAHwHZ9Pc69a4kkSLjM7yy84trti8QNBDrF8A/exec";
 
   const bird = document.getElementById('bird'), wing = document.getElementById('wing'), game = document.getElementById('game'), flash = document.getElementById('flash'), scoreEl = document.getElementById('score'), menu = document.getElementById('menu'), readyOverlay = document.getElementById('ready-overlay'), pauseOverlay = document.getElementById('pause-overlay'), pauseBtn = document.getElementById('pauseBtn'), finalScoreEl = document.getElementById('final-score'), highScoreEl = document.getElementById('high-score'), groundEl = document.getElementById('ground');
   
   let by = 230, bv = 0, pipes = [], clouds = [], buildings = [], score = 0, running = false, waiting = false, isPaused = false, isDead = false, highscore = 0, groundX = 0, rotation = 0, tick = 0;
   const gravity = 0.28, jump = -6.5, gameSpeed = 4.5;
 
-  async function fetchLeaderboard() {
-    try {
-      const res = await fetch(scriptURL);
-      const entries = await res.json();
-      const list = document.getElementById('leaderboard-list');
+ async function fetchLeaderboard() {
+  try {
+    // Adding {mode: 'cors'} and checking response helps bypass blocks
+    const res = await fetch(scriptURL, { 
+      method: 'GET',
+      mode: 'cors',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    
+    if (!res.ok) throw new Error("Network response was not ok");
+    const entries = await res.json();
+    const list = document.getElementById('leaderboard-list');
+    
+    // Safety check to ensure entries is an array before mapping
+    if (Array.isArray(entries)) {
       list.innerHTML = "<strong>TOP PLAYERS:</strong><br>" + 
-        entries.slice(0,5).map((e, i) => '<li>' + (i+1) + '. ' + **(e[0] || "Guest")** + ': ' + **(e[1] || 0)** + '</li>')
-
-    } catch (e) { document.getElementById('leaderboard-list').innerText = "Leaderboard Offline"; }
+        entries.slice(0,5).map((e, i) => '<li>' + (i+1) + '. ' + (e[0] || "---") + ': ' + (e[1] || 0) + '</li>').join('');
+    } else {
+      list.innerText = "No scores found.";
+    }
+  } catch (e) { 
+    console.error("Leaderboard error:", e);
+    document.getElementById('leaderboard-list').innerText = "Leaderboard Offline"; 
   }
+}
+
+
 
   async function submitScore() {
     const name = document.getElementById('player-name').value.trim();
@@ -98,8 +108,8 @@
     try {
       await fetch(scriptURL, {
         method: "POST",
-      
-headers: { "Content-Type": "text/plain" },        
+        mode: "no-cors",
+        headers: { "Content-Type": "text/plain" },
         body: JSON.stringify({ name: name, score: score })
       });
       document.getElementById('save-section').style.display = 'none';
@@ -184,10 +194,18 @@ headers: { "Content-Type": "text/plain" },
     groundEl.style.transform = `translateX(${groundX}px)`;
 
     if (Math.random() < 0.01) createCloud();
-    clouds.forEach((c, i) => { c.x -= c.s; c.el.style.left = c.x + 'px'; if (c.x < -100) { c.el.remove(); clouds.splice(i, 1); } });
+    for (let i = clouds.length - 1; i >= 0; i--) {
+      clouds[i].x -= clouds[i].s;
+      clouds[i].el.style.left = clouds[i].x + 'px';
+      if (clouds[i].x < -100) { clouds[i].el.remove(); clouds.splice(i, 1); }
+    }
 
     if (Math.random() < 0.015) createBuilding();
-    buildings.forEach((b, i) => { b.x -= b.s; b.el.style.left = b.x + 'px'; if (b.x < -100) { b.el.remove(); buildings.splice(i, 1); } });
+    for (let i = buildings.length - 1; i >= 0; i--) {
+      buildings[i].x -= buildings[i].s;
+      buildings[i].el.style.left = buildings[i].x + 'px';
+      if (buildings[i].x < -100) { buildings[i].el.remove(); buildings.splice(i, 1); }
+    }
 
     if (!running && !isDead) {
         bird.style.top = (by + Math.sin(tick * 0.1) * 8) + 'px'; bird.style.transform = 'rotate(0deg)';
@@ -197,13 +215,14 @@ headers: { "Content-Type": "text/plain" },
         bird.style.top = by + 'px'; bird.style.transform = `rotate(${rotation}deg)`;
         if (by < 0 || by > 420) gameOver();
         if (pipes.length === 0) createPipe();
-        pipes.forEach((p, i) => {
+        for (let i = pipes.length - 1; i >= 0; i--) {
+            let p = pipes[i];
             p.x -= gameSpeed; p.t.style.left = p.b.style.left = p.x + 'px';
             const br = bird.getBoundingClientRect(), tr = p.t.getBoundingClientRect(), bbr = p.b.getBoundingClientRect();
             if (br.right > tr.left && br.left < tr.right && (br.top < tr.bottom || br.bottom > bbr.top)) gameOver();
             if (!p.passed && p.x < 50) { p.passed = true; score++; scoreEl.innerText = score; updateTimeOfDay(); }
             if (p.x < -60) { p.t.remove(); p.b.remove(); pipes.splice(i, 1); }
-        });
+        }
     }
     requestAnimationFrame(update);
   }
