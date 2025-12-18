@@ -74,7 +74,7 @@
 
 <script>
   // LEADERBOARD CONFIG
-  const scriptURL = https://script.google.com/macros/s/AKfycbwyU8jNtdNeruIpDP3LDrAF3jVDzpV-aIZDT6zkSRelBMTaxv_227kOA5Q9NH0Ig0oOxA/exec;
+  const scriptURL = https://script.google.com/macros/s/AKfycbzb8kDaAgWsxrv9DCQx5QX-bwAor9dGj5GsdBuW0atOR5fw5oY_7eUOvytr0iM3k429zA/exec;
 
   const bird = document.getElementById('bird'), wing = document.getElementById('wing'), game = document.getElementById('game'), flash = document.getElementById('flash'), scoreEl = document.getElementById('score'), menu = document.getElementById('menu'), readyOverlay = document.getElementById('ready-overlay'), pauseOverlay = document.getElementById('pause-overlay'), pauseBtn = document.getElementById('pauseBtn'), finalScoreEl = document.getElementById('final-score'), highScoreEl = document.getElementById('high-score'), groundEl = document.getElementById('ground');
   
@@ -87,7 +87,8 @@
       const entries = await res.json();
       const list = document.getElementById('leaderboard-list');
       list.innerHTML = "<strong>TOP PLAYERS:</strong><br>" + 
-        entries.slice(0,5).map((e, i) => '<li>' + (i+1) + '. ' + e[0] + ': ' + e[1] + '</li>').join('') || "<li>No scores yet!</li>";
+        entries.slice(0,5).map((e, i) => '<li>' + (i+1) + '. ' + **(e[0] || "Guest")** + ': ' + **(e[1] || 0)** + '</li>')
+
     } catch (e) { document.getElementById('leaderboard-list').innerText = "Leaderboard Offline"; }
   }
 
@@ -97,8 +98,8 @@
     try {
       await fetch(scriptURL, {
         method: "POST",
-        mode: "no-cors",
-        headers: { "Content-Type": "application/json" },
+      
+headers: { "Content-Type": "text/plain" },        
         body: JSON.stringify({ name: name, score: score })
       });
       document.getElementById('save-section').style.display = 'none';
