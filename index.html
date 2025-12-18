@@ -80,7 +80,7 @@
     const res = await fetch(scriptURL, { 
       method: 'GET',
       mode: 'cors',
-      headers: { 'Content-Type': 'application/json' }
+      headers: { 'Content-Type': 'text/plain' }
     });
     
     if (!res.ok) throw new Error("Network response was not ok");
